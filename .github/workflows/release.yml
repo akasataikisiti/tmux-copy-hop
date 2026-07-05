@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  linux-x86_64:
+    name: Build Linux x86_64 release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Test
+        run: cargo test --locked
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Package
+        run: |
+          set -eu
+          version="${GITHUB_REF_NAME}"
+          package="tmux-copy-hop-${version}-linux-x86_64"
+          asset="tmux-copy-hop-linux-x86_64.tar.gz"
+          mkdir -p "dist/${package}"
+          cp target/release/tmux-copy-hop "dist/${package}/"
+          cp README.md tmux-copy-hop.tmux "dist/${package}/"
+          tar -C dist -czf "dist/${asset}" "${package}"
+          sha256sum "dist/${asset}" > "dist/${asset}.sha256"
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            dist/*.tar.gz \
+            dist/*.sha256 \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

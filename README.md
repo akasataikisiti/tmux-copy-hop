@@ -24,6 +24,22 @@ Cancel with `Escape` or `Ctrl-C`.
 
 ## Install
 
+Install the latest Linux x86_64 release:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akasataikisiti/tmux-copy-hop/main/install.sh | sh
+```
+
+Then add this binding:
+
+```tmux
+bind-key j run-shell "tmux-copy-hop jump"
+```
+
+Make sure `~/.local/bin` is on `PATH` inside tmux.
+
+### Build From Source
+
 Build the binary:
 
 ```bash
@@ -43,6 +59,20 @@ run-shell /path/to/tmux-copy-hop/tmux-copy-hop.tmux
 ```
 
 The MVP does not automatically build the Rust binary during plugin install.
+
+### Install Options
+
+Install to a custom directory:
+
+```bash
+INSTALL_DIR=/usr/local/bin sh install.sh
+```
+
+Install a specific version:
+
+```bash
+VERSION=v0.1.0 sh install.sh
+```
 
 ## Copy Workflow
 
@@ -64,7 +94,7 @@ Enter
 - ASCII search is the primary target.
 - Popup rendering is plain text with highlighted labels.
 - The popup is centered with the target pane's width and height.
-- Movement uses copy-mode relative cursor commands.
+- Movement uses copy-mode commands from the visible top line.
 - Full Unicode, mouse support, fuzzy search, OSC52, and true overlay rendering
   are out of scope for the MVP.
 
