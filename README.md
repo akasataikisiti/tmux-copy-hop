@@ -76,15 +76,65 @@ VERSION=v0.1.0 sh install.sh
 
 ## Copy Workflow
 
+Use `tmux-copy-hop` to place the copy-mode cursor at the start and end of the
+range you want to copy. The plugin only moves the cursor; selection start and
+copy are still normal tmux copy-mode actions.
+
+### 1. Jump to the start position
+
+Press your binding from a normal pane:
+
 ```text
 prefix+j
-type the start character
-type the start label
-Space or v
+```
+
+Then type one visible character near the place where you want the copy range to
+start. `tmux-copy-hop` shows labels on every matching character. Type the label
+for the exact start position.
+
+After a valid label, tmux enters copy-mode and moves the cursor to that cell.
+
+### 2. Start the selection
+
+Use your usual tmux copy-mode key to begin selection:
+
+```text
+Space
+```
+
+or, if your copy-mode bindings use vi-style selection:
+
+```text
+v
+```
+
+### 3. Jump to the end position
+
+While the selection is active, press the binding again:
+
+```text
 prefix+j
-type the end character
-type the end label
+```
+
+Type one visible character near the end of the range, then type the label for
+the exact end position. The existing selection is preserved while the cursor
+moves.
+
+### 4. Copy
+
+Use the normal tmux copy key:
+
+```text
 Enter
+```
+
+Full example:
+
+```text
+prefix+j        # choose the start cell
+Space or v      # begin selection
+prefix+j        # choose the end cell
+Enter           # copy selection
 ```
 
 ## Current Limitations
