@@ -80,7 +80,7 @@ tmux-copy-hop
 
 Usage:
   tmux-copy-hop jump
-  tmux-copy-hop popup <pane-id> <width> <height> <was-copy-mode> <cursor-x> <cursor-y>
+  tmux-copy-hop popup <pane-id> <width> <height> <was-copy-mode> <cursor-x> <cursor-y> <scroll-position>
 
 Commands:
   jump    Start a Hop-style pane jump

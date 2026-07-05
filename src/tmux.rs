@@ -48,6 +48,7 @@ pub struct PaneInfo {
     pub mode: String,
     pub pane_cursor: Point,
     pub copy_cursor: Option<Point>,
+    pub scroll_position: usize,
 }
 
 impl PaneInfo {
@@ -68,14 +69,15 @@ pub fn run_jump() -> Result<()> {
     let pane = current_pane_info()?;
     let exe = env::current_exe()?;
     let command = format!(
-        "{} popup {} {} {} {} {} {}",
+        "{} popup {} {} {} {} {} {} {}",
         shell_quote(&exe.to_string_lossy()),
         shell_quote(&pane.pane_id),
         pane.width,
         pane.height,
         if pane.is_copy_mode() { "1" } else { "0" },
         pane.cursor_for_labeling().x,
-        pane.cursor_for_labeling().y
+        pane.cursor_for_labeling().y,
+        pane.scroll_position
     );
 
     tmux_status(
@@ -95,7 +97,18 @@ pub fn run_popup(args: &[String]) -> Result<()> {
     let popup = PopupArgs::parse(args)?;
     let _raw_mode = RawMode::enable()?;
 
-    let lines = normalize_lines(capture_visible_lines(&popup.pane_id)?, popup.height);
+    let lines = normalize_lines(
+        capture_visible_lines(
+            &popup.pane_id,
+            popup.height,
+            if popup.was_copy_mode {
+                popup.scroll_position
+            } else {
+                0
+            },
+        )?,
+        popup.height,
+    );
     render_popup_screen(&render_plain_screen(&lines, popup.width))?;
     display_message("tmux-copy-hop: type jump key");
 
@@ -156,7 +169,7 @@ fn current_pane_info() -> Result<PaneInfo> {
             .arg("-p")
             .arg("-F")
             .arg(
-                "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_mode}\t#{cursor_x}\t#{cursor_y}\t#{copy_cursor_x}\t#{copy_cursor_y}",
+                "#{pane_id}\t#{pane_width}\t#{pane_height}\t#{pane_mode}\t#{cursor_x}\t#{cursor_y}\t#{copy_cursor_x}\t#{copy_cursor_y}\t#{scroll_position}",
             ),
     )?;
 
@@ -165,9 +178,9 @@ fn current_pane_info() -> Result<PaneInfo> {
 
 fn parse_pane_info(value: &str) -> Result<PaneInfo> {
     let fields = value.split('\t').collect::<Vec<_>>();
-    if fields.len() != 8 {
+    if fields.len() != 9 {
         return Err(Error::Parse(format!(
-            "expected 8 pane fields, got {}",
+            "expected 9 pane fields, got {}",
             fields.len()
         )));
     }
@@ -188,20 +201,41 @@ fn parse_pane_info(value: &str) -> Result<PaneInfo> {
         mode: fields[3].to_string(),
         pane_cursor,
         copy_cursor,
+        scroll_position: fields[8].parse::<usize>().unwrap_or(0),
     })
 }
 
-fn capture_visible_lines(pane_id: &str) -> Result<Vec<String>> {
+fn capture_visible_lines(
+    pane_id: &str,
+    height: usize,
+    scroll_position: usize,
+) -> Result<Vec<String>> {
+    let (start_line, end_line) = capture_range(height, scroll_position);
     let output = tmux_output(
         tmux_command()
             .arg("capture-pane")
             .arg("-p")
             .arg("-N")
+            .arg("-S")
+            .arg(start_line)
+            .arg("-E")
+            .arg(end_line.to_string())
             .arg("-t")
             .arg(pane_id),
     )?;
 
     Ok(output.lines().map(|line| line.to_string()).collect())
+}
+
+fn capture_range(height: usize, scroll_position: usize) -> (String, String) {
+    let start_line = if scroll_position == 0 {
+        "0".to_string()
+    } else {
+        format!("-{scroll_position}")
+    };
+    let end_line = height as isize - scroll_position as isize - 1;
+
+    (start_line, end_line.to_string())
 }
 
 fn normalize_lines(mut lines: Vec<String>, height: usize) -> Vec<String> {
@@ -371,13 +405,14 @@ struct PopupArgs {
     height: usize,
     was_copy_mode: bool,
     cursor: Point,
+    scroll_position: usize,
 }
 
 impl PopupArgs {
     fn parse(args: &[String]) -> Result<Self> {
-        if args.len() != 6 {
+        if args.len() != 7 {
             return Err(Error::Parse(format!(
-                "popup expects 6 args, got {}",
+                "popup expects 7 args, got {}",
                 args.len()
             )));
         }
@@ -391,6 +426,7 @@ impl PopupArgs {
                 x: parse_usize(&args[4], "cursor_x")?,
                 y: parse_usize(&args[5], "cursor_y")?,
             },
+            scroll_position: parse_usize(&args[6], "scroll_position")?,
         })
     }
 }
@@ -401,28 +437,30 @@ mod tests {
 
     #[test]
     fn parses_pane_info_with_copy_cursor() {
-        let pane = parse_pane_info("%1\t80\t24\tcopy-mode\t10\t20\t3\t4").unwrap();
+        let pane = parse_pane_info("%1\t80\t24\tcopy-mode\t10\t20\t3\t4\t8").unwrap();
 
         assert_eq!(pane.pane_id, "%1");
         assert_eq!(pane.width, 80);
         assert_eq!(pane.height, 24);
         assert_eq!(pane.pane_cursor, Point { x: 10, y: 20 });
         assert_eq!(pane.copy_cursor, Some(Point { x: 3, y: 4 }));
+        assert_eq!(pane.scroll_position, 8);
         assert_eq!(pane.cursor_for_labeling(), Point { x: 3, y: 4 });
     }
 
     #[test]
     fn parses_pane_info_without_copy_cursor() {
-        let pane = parse_pane_info("%1\t80\t24\t\t10\t20\t\t").unwrap();
+        let pane = parse_pane_info("%1\t80\t24\t\t10\t20\t\t\t").unwrap();
 
         assert!(!pane.is_copy_mode());
         assert_eq!(pane.copy_cursor, None);
+        assert_eq!(pane.scroll_position, 0);
         assert_eq!(pane.cursor_for_labeling(), Point { x: 10, y: 20 });
     }
 
     #[test]
     fn parses_pane_info_without_copy_cursor_after_removing_only_newline() {
-        let output = "%1\t80\t24\t\t10\t20\t\t\n";
+        let output = "%1\t80\t24\t\t10\t20\t\t\t\n";
         let pane = parse_pane_info(output.trim_end_matches(['\r', '\n'])).unwrap();
 
         assert_eq!(pane.copy_cursor, None);
@@ -440,5 +478,12 @@ mod tests {
             normalize_lines(vec!["a".into()], 2),
             vec!["a".to_string(), String::new()]
         );
+    }
+
+    #[test]
+    fn calculates_capture_range_for_scrolled_copy_mode_view() {
+        assert_eq!(capture_range(10, 0), ("0".to_string(), "9".to_string()));
+        assert_eq!(capture_range(10, 8), ("-8".to_string(), "1".to_string()));
+        assert_eq!(capture_range(24, 30), ("-30".to_string(), "-7".to_string()));
     }
 }
