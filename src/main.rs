@@ -16,9 +16,8 @@ fn main() -> ExitCode {
         }
         Some(_) => {
             let command = command.unwrap_or_default();
-            eprintln!("tmux-copy-hop: unknown command '{command}'");
-            eprintln!("Run 'tmux-copy-hop --help' for usage.");
-            ExitCode::from(2)
+            report_error(&format!("tmux-copy-hop: unknown command '{command}'"));
+            failure_exit_code()
         }
     }
 }
@@ -33,17 +32,29 @@ fn exit(result: Result<(), Error>) -> ExitCode {
         Err(Error::Cancelled | Error::NoMatches(_) | Error::InvalidLabel) => ExitCode::SUCCESS,
         Err(error) => {
             report_error(&format!("tmux-copy-hop: {error}"));
-            ExitCode::from(1)
+            failure_exit_code()
         }
     }
 }
 
 fn report_error(message: &str) {
-    if env::var_os("TMUX").is_some() || env::var_os("TMUX_COPY_HOP_SOCKET").is_some() {
+    if running_inside_tmux() {
         display_message(message);
     } else {
         eprintln!("{message}");
     }
+}
+
+fn failure_exit_code() -> ExitCode {
+    if running_inside_tmux() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(1)
+    }
+}
+
+fn running_inside_tmux() -> bool {
+    env::var_os("TMUX").is_some() || env::var_os("TMUX_COPY_HOP_SOCKET").is_some()
 }
 
 fn print_help() {
