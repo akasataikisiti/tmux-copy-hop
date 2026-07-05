@@ -16,14 +16,30 @@ fn main() -> ExitCode {
         }
         Some(_) => {
             let command = command.unwrap_or_default();
-            report_error(&format!("tmux-copy-hop: unknown command '{command}'"));
+            report_error(&format!(
+                "tmux-copy-hop: unknown command '{}'",
+                display_command(&command)
+            ));
             failure_exit_code()
         }
     }
 }
 
 fn normalize_command(command: &str) -> &str {
-    command.trim_matches(|ch: char| ch.is_ascii_whitespace() || ch.is_control())
+    let command =
+        command.trim_start_matches(|ch: char| ch.is_ascii_whitespace() || ch.is_control());
+    command
+        .split_once(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
+        .map(|(command, _)| command)
+        .unwrap_or(command)
+        .trim_end_matches(|ch: char| ch.is_ascii_whitespace() || ch.is_control())
+}
+
+fn display_command(command: &str) -> String {
+    command
+        .chars()
+        .flat_map(|ch| ch.escape_default())
+        .collect::<String>()
 }
 
 fn exit(result: Result<(), Error>) -> ExitCode {
@@ -74,7 +90,7 @@ Commands:
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_command;
+    use super::{display_command, normalize_command};
 
     #[test]
     fn normalizes_tmux_config_line_artifacts() {
@@ -82,5 +98,13 @@ mod tests {
         assert_eq!(normalize_command("jump\n"), "jump");
         assert_eq!(normalize_command("jump\r"), "jump");
         assert_eq!(normalize_command("\u{1b}jump"), "jump");
+        assert_eq!(normalize_command("jump\u{21b4}"), "jump");
+        assert_eq!(normalize_command("jump\u{23ce}"), "jump");
+        assert_eq!(normalize_command("jump anything-after"), "jump");
+    }
+
+    #[test]
+    fn escapes_unknown_command_for_status_message() {
+        assert_eq!(display_command("jump\n"), "jump\\n");
     }
 }
