@@ -144,7 +144,7 @@ fn current_pane_info() -> Result<PaneInfo> {
             ),
     )?;
 
-    parse_pane_info(output.trim_end())
+    parse_pane_info(output.trim_end_matches(['\r', '\n']))
 }
 
 fn parse_pane_info(value: &str) -> Result<PaneInfo> {
@@ -219,7 +219,10 @@ fn current_copy_cursor(pane_id: &str) -> Result<Point> {
             .arg("-F")
             .arg("#{copy_cursor_x}\t#{copy_cursor_y}"),
     )?;
-    let fields = output.trim_end().split('\t').collect::<Vec<_>>();
+    let fields = output
+        .trim_end_matches(['\r', '\n'])
+        .split('\t')
+        .collect::<Vec<_>>();
     if fields.len() != 2 {
         return Err(Error::Parse("expected copy cursor x/y".to_string()));
     }
@@ -421,6 +424,14 @@ mod tests {
         assert!(!pane.is_copy_mode());
         assert_eq!(pane.copy_cursor, None);
         assert_eq!(pane.cursor_for_labeling(), Point { x: 10, y: 20 });
+    }
+
+    #[test]
+    fn parses_pane_info_without_copy_cursor_after_removing_only_newline() {
+        let output = "%1\t80\t24\t\t10\t20\t\t\n";
+        let pane = parse_pane_info(output.trim_end_matches(['\r', '\n'])).unwrap();
+
+        assert_eq!(pane.copy_cursor, None);
     }
 
     #[test]
