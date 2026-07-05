@@ -77,7 +77,7 @@ pub fn run_jump() -> Result<()> {
     );
 
     tmux_status(
-        Command::new("tmux")
+        tmux_command()
             .arg("display-popup")
             .arg("-E")
             .arg("-w")
@@ -135,7 +135,7 @@ pub fn run_popup(args: &[String]) -> Result<()> {
 
 fn current_pane_info() -> Result<PaneInfo> {
     let output = tmux_output(
-        Command::new("tmux")
+        tmux_command()
             .arg("display-message")
             .arg("-p")
             .arg("-F")
@@ -177,7 +177,7 @@ fn parse_pane_info(value: &str) -> Result<PaneInfo> {
 
 fn capture_visible_lines(pane_id: &str) -> Result<Vec<String>> {
     let output = tmux_output(
-        Command::new("tmux")
+        tmux_command()
             .arg("capture-pane")
             .arg("-p")
             .arg("-N")
@@ -199,7 +199,7 @@ fn normalize_lines(mut lines: Vec<String>, height: usize) -> Vec<String> {
 
 fn move_to_target(pane_id: &str, was_copy_mode: bool, target: Point) -> Result<()> {
     if !was_copy_mode {
-        tmux_status(Command::new("tmux").arg("copy-mode").arg("-t").arg(pane_id))?;
+        tmux_status(tmux_command().arg("copy-mode").arg("-t").arg(pane_id))?;
     }
 
     let current = current_copy_cursor(pane_id)?;
@@ -211,7 +211,7 @@ fn move_to_target(pane_id: &str, was_copy_mode: bool, target: Point) -> Result<(
 
 fn current_copy_cursor(pane_id: &str) -> Result<Point> {
     let output = tmux_output(
-        Command::new("tmux")
+        tmux_command()
             .arg("display-message")
             .arg("-p")
             .arg("-t")
@@ -252,7 +252,7 @@ fn repeat_copy_command(pane_id: &str, copy_command: &str, count: usize) -> Resul
     }
 
     tmux_status(
-        Command::new("tmux")
+        tmux_command()
             .arg("send-keys")
             .arg("-t")
             .arg(pane_id)
@@ -264,10 +264,16 @@ fn repeat_copy_command(pane_id: &str, copy_command: &str, count: usize) -> Resul
 }
 
 fn display_message(message: &str) {
-    let _ = Command::new("tmux")
-        .arg("display-message")
-        .arg(message)
-        .status();
+    let _ = tmux_command().arg("display-message").arg(message).status();
+}
+
+fn tmux_command() -> Command {
+    let mut command = Command::new("tmux");
+    if let Ok(socket) = env::var("TMUX_COPY_HOP_SOCKET") {
+        command.arg("-S").arg(socket);
+    }
+
+    command
 }
 
 fn tmux_output(command: &mut Command) -> Result<String> {
