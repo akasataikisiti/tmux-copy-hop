@@ -3,7 +3,9 @@ use std::fmt;
 use std::io::{self, Read, Write};
 use std::process::{Command, Stdio};
 
-use crate::hop::{Point, assign_labels, find_candidates, render_labeled_screen};
+use crate::hop::{
+    Point, assign_labels, find_candidates, render_labeled_screen, render_plain_screen,
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -94,7 +96,7 @@ pub fn run_popup(args: &[String]) -> Result<()> {
     let _raw_mode = RawMode::enable()?;
 
     let lines = normalize_lines(capture_visible_lines(&popup.pane_id)?, popup.height);
-    render_popup_screen(&plain_screen(&lines, popup.width))?;
+    render_popup_screen(&render_plain_screen(&lines, popup.width))?;
     display_message("tmux-copy-hop: type jump key");
 
     io::stdout().flush()?;
@@ -134,14 +136,6 @@ pub fn run_popup(args: &[String]) -> Result<()> {
     move_to_target(&popup.pane_id, popup.was_copy_mode, target)?;
 
     Ok(())
-}
-
-fn plain_screen(lines: &[String], width: usize) -> String {
-    lines
-        .iter()
-        .map(|line| line.chars().take(width).collect::<String>())
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn render_popup_screen(screen: &str) -> Result<()> {
@@ -469,14 +463,6 @@ mod tests {
         assert_eq!(
             normalize_lines(vec!["a".into()], 2),
             vec!["a".to_string(), String::new()]
-        );
-    }
-
-    #[test]
-    fn renders_plain_screen_before_jump_key_input() {
-        assert_eq!(
-            plain_screen(&["abcdef".to_string(), "xy".to_string()], 3),
-            "abc\nxy"
         );
     }
 }

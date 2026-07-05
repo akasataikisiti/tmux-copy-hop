@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub const LABEL_ALPHABET: &str = "asdfghjklqwertyuiopzxcvbnm";
+const TAB_WIDTH: usize = 8;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Point {
@@ -42,7 +43,7 @@ pub fn find_candidates(lines: &[String], needle: char) -> Vec<Candidate> {
                 });
             }
 
-            x += char_width(ch);
+            x += char_width_at(ch, x);
         }
     }
 
@@ -158,6 +159,19 @@ pub fn render_labeled_screen(
         .join("\n")
 }
 
+pub fn render_plain_screen(lines: &[String], pane_width: usize) -> String {
+    lines
+        .iter()
+        .map(|line| {
+            line_to_cells(line, pane_width)
+                .concat()
+                .trim_end()
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn label_display_start(candidate_x: usize, label_width: usize, pane_width: usize) -> usize {
     match (
         label_width.cmp(&pane_width),
@@ -174,7 +188,7 @@ fn line_to_cells(line: &str, pane_width: usize) -> Vec<String> {
     let mut x = 0;
 
     for ch in line.chars() {
-        let width = char_width(ch);
+        let width = char_width_at(ch, x);
         if width == 0 {
             continue;
         }
@@ -182,14 +196,20 @@ fn line_to_cells(line: &str, pane_width: usize) -> Vec<String> {
             break;
         }
 
-        cells[x] = ch.to_string();
+        if ch != '\t' {
+            cells[x] = ch.to_string();
+        }
         x += width;
     }
 
     cells
 }
 
-fn char_width(ch: char) -> usize {
+fn char_width_at(ch: char, x: usize) -> usize {
+    if ch == '\t' {
+        return TAB_WIDTH - (x % TAB_WIDTH);
+    }
+
     UnicodeWidthChar::width(ch).unwrap_or(0)
 }
 
@@ -217,6 +237,23 @@ mod tests {
                 },
                 Candidate {
                     point: Point { x: 2, y: 1 }
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn expands_tabs_to_terminal_cells_when_finding_candidates() {
+        let candidates = find_candidates(&lines(&["a\tb", "1234567\tb"]), 'b');
+
+        assert_eq!(
+            candidates,
+            vec![
+                Candidate {
+                    point: Point { x: 8, y: 0 }
+                },
+                Candidate {
+                    point: Point { x: 8, y: 1 }
                 }
             ]
         );
@@ -315,5 +352,13 @@ mod tests {
         );
 
         assert_eq!(rendered, "a\u{1b}[34;1ms\u{1b}[0mc");
+    }
+
+    #[test]
+    fn renders_plain_screen_with_cell_widths() {
+        assert_eq!(
+            render_plain_screen(&lines(&["a\tb", "界a"]), 10),
+            "a       b\n界 a"
+        );
     }
 }
