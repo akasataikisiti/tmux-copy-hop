@@ -218,51 +218,16 @@ fn move_to_target(pane_id: &str, was_copy_mode: bool, target: Point) -> Result<(
         tmux_status(tmux_command().arg("copy-mode").arg("-t").arg(pane_id))?;
     }
 
-    let current = current_copy_cursor(pane_id)?;
-    move_vertical(pane_id, current.y, target.y)?;
-    move_horizontal(pane_id, current.x, target.x)?;
+    move_to_visible_point(pane_id, target)?;
 
     Ok(())
 }
 
-fn current_copy_cursor(pane_id: &str) -> Result<Point> {
-    let output = tmux_output(
-        tmux_command()
-            .arg("display-message")
-            .arg("-p")
-            .arg("-t")
-            .arg(pane_id)
-            .arg("-F")
-            .arg("#{copy_cursor_x}\t#{copy_cursor_y}"),
-    )?;
-    let fields = output
-        .trim_end_matches(['\r', '\n'])
-        .split('\t')
-        .collect::<Vec<_>>();
-    if fields.len() != 2 {
-        return Err(Error::Parse("expected copy cursor x/y".to_string()));
-    }
-
-    Ok(Point {
-        x: parse_usize(fields[0], "copy_cursor_x")?,
-        y: parse_usize(fields[1], "copy_cursor_y")?,
-    })
-}
-
-fn move_vertical(pane_id: &str, current_y: usize, target_y: usize) -> Result<()> {
-    if target_y > current_y {
-        repeat_copy_command(pane_id, "cursor-down", target_y - current_y)
-    } else {
-        repeat_copy_command(pane_id, "cursor-up", current_y - target_y)
-    }
-}
-
-fn move_horizontal(pane_id: &str, current_x: usize, target_x: usize) -> Result<()> {
-    if target_x > current_x {
-        repeat_copy_command(pane_id, "cursor-right", target_x - current_x)
-    } else {
-        repeat_copy_command(pane_id, "cursor-left", current_x - target_x)
-    }
+fn move_to_visible_point(pane_id: &str, target: Point) -> Result<()> {
+    copy_command(pane_id, "top-line")?;
+    copy_command(pane_id, "start-of-line")?;
+    repeat_copy_command(pane_id, "cursor-down", target.y)?;
+    repeat_copy_command(pane_id, "cursor-right", target.x)
 }
 
 fn repeat_copy_command(pane_id: &str, copy_command: &str, count: usize) -> Result<()> {
@@ -278,6 +243,17 @@ fn repeat_copy_command(pane_id: &str, copy_command: &str, count: usize) -> Resul
             .arg("-X")
             .arg("-N")
             .arg(count.to_string())
+            .arg(copy_command),
+    )
+}
+
+fn copy_command(pane_id: &str, copy_command: &str) -> Result<()> {
+    tmux_status(
+        tmux_command()
+            .arg("send-keys")
+            .arg("-t")
+            .arg(pane_id)
+            .arg("-X")
             .arg(copy_command),
     )
 }
