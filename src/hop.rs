@@ -198,6 +198,9 @@ fn line_to_cells(line: &str, pane_width: usize) -> Vec<String> {
 
         if ch != '\t' {
             cells[x] = ch.to_string();
+            for continuation_x in x + 1..(x + width).min(pane_width) {
+                cells[continuation_x].clear();
+            }
         }
         x += width;
     }
@@ -256,6 +259,18 @@ mod tests {
                     point: Point { x: 8, y: 1 }
                 }
             ]
+        );
+    }
+
+    #[test]
+    fn finds_ascii_matches_after_japanese_text_at_cell_positions() {
+        let candidates = find_candidates(&lines(&["日本語abc"]), 'a');
+
+        assert_eq!(
+            candidates,
+            vec![Candidate {
+                point: Point { x: 6, y: 0 }
+            }]
         );
     }
 
@@ -356,9 +371,25 @@ mod tests {
 
     #[test]
     fn renders_plain_screen_with_cell_widths() {
-        assert_eq!(
-            render_plain_screen(&lines(&["a\tb", "界a"]), 10),
-            "a       b\n界 a"
+        let rendered = render_plain_screen(&lines(&["a\tb", "界a", "日本語abc"]), 12);
+
+        assert_eq!(rendered, "a       b\n界a\n日本語abc");
+        assert_eq!(visual_width("界a"), 3);
+        assert_eq!(visual_width("日本語abc"), 9);
+    }
+
+    #[test]
+    fn renders_labels_after_japanese_text_without_extra_padding() {
+        let rendered = render_labeled_screen(
+            &lines(&["日本語abc"]),
+            &[LabeledCandidate {
+                point: Point { x: 6, y: 0 },
+                label: "a".to_string(),
+                display_start_x: 6,
+            }],
+            12,
         );
+
+        assert_eq!(rendered, "日本語\u{1b}[34;1ma\u{1b}[0mbc");
     }
 }
