@@ -266,7 +266,7 @@ fn repeat_copy_command(pane_id: &str, copy_command: &str, count: usize) -> Resul
     )
 }
 
-fn display_message(message: &str) {
+pub fn display_message(message: &str) {
     let _ = tmux_command().arg("display-message").arg(message).status();
 }
 
