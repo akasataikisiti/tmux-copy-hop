@@ -80,6 +80,7 @@ pub fn run_jump() -> Result<()> {
         tmux_command()
             .arg("display-popup")
             .arg("-E")
+            .arg("-B")
             .arg("-w")
             .arg(pane.width.to_string())
             .arg("-h")
@@ -92,11 +93,13 @@ pub fn run_popup(args: &[String]) -> Result<()> {
     let popup = PopupArgs::parse(args)?;
     let _raw_mode = RawMode::enable()?;
 
-    print!("jump key: ");
+    let lines = normalize_lines(capture_visible_lines(&popup.pane_id)?, popup.height);
+    render_popup_screen(&plain_screen(&lines, popup.width))?;
+    display_message("tmux-copy-hop: type jump key");
+
     io::stdout().flush()?;
     let needle = read_ascii_char()?;
 
-    let lines = normalize_lines(capture_visible_lines(&popup.pane_id)?, popup.height);
     let candidates = find_candidates(&lines, needle);
     if candidates.is_empty() {
         display_message(&format!("tmux-copy-hop: no matches for '{needle}'"));
@@ -110,8 +113,8 @@ pub fn run_popup(args: &[String]) -> Result<()> {
         .unwrap_or(0);
     let rendered = render_labeled_screen(&lines, &labeled, popup.width);
 
-    print!("\x1b[2J\x1b[H{rendered}");
-    io::stdout().flush()?;
+    render_popup_screen(&rendered)?;
+    display_message("tmux-copy-hop: type label");
 
     let label = read_ascii_string(label_width)?;
     let target = labeled
@@ -130,6 +133,25 @@ pub fn run_popup(args: &[String]) -> Result<()> {
 
     move_to_target(&popup.pane_id, popup.was_copy_mode, target)?;
 
+    Ok(())
+}
+
+fn plain_screen(lines: &[String], width: usize) -> String {
+    lines
+        .iter()
+        .map(|line| line.chars().take(width).collect::<String>())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn render_popup_screen(screen: &str) -> Result<()> {
+    print!("\x1b[?25l\x1b[2J");
+
+    for (index, line) in screen.lines().enumerate() {
+        print!("\x1b[{};1H{}", index + 1, line);
+    }
+
+    io::stdout().flush()?;
     Ok(())
 }
 
@@ -364,6 +386,8 @@ impl RawMode {
 
 impl Drop for RawMode {
     fn drop(&mut self) {
+        print!("\x1b[?25h");
+        let _ = io::stdout().flush();
         let _ = Command::new("stty")
             .arg(&self.saved)
             .stdin(Stdio::inherit())
@@ -445,6 +469,14 @@ mod tests {
         assert_eq!(
             normalize_lines(vec!["a".into()], 2),
             vec!["a".to_string(), String::new()]
+        );
+    }
+
+    #[test]
+    fn renders_plain_screen_before_jump_key_input() {
+        assert_eq!(
+            plain_screen(&["abcdef".to_string(), "xy".to_string()], 3),
+            "abc\nxy"
         );
     }
 }
