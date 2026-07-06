@@ -135,7 +135,10 @@ pub fn run_popup(args: &[String]) -> Result<()> {
     let target = labeled
         .iter()
         .find(|candidate| candidate.label == label)
-        .map(|candidate| candidate.point)
+        .map(|candidate| Point {
+            x: candidate.move_x,
+            y: candidate.point.y,
+        })
         .ok_or(Error::InvalidLabel);
 
     let target = match target {

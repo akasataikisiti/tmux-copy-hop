@@ -21,11 +21,13 @@ impl Point {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Candidate {
     pub point: Point,
+    pub move_x: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LabeledCandidate {
     pub point: Point,
+    pub move_x: usize,
     pub label: String,
     pub display_start_x: usize,
 }
@@ -35,15 +37,21 @@ pub fn find_candidates(lines: &[String], needle: char) -> Vec<Candidate> {
 
     for (y, line) in lines.iter().enumerate() {
         let mut x = 0;
+        let mut move_x = 0;
 
         for ch in line.chars() {
             if ch == needle {
                 candidates.push(Candidate {
                     point: Point { x, y },
+                    move_x,
                 });
             }
 
-            x += char_width_at(ch, x);
+            let width = char_width_at(ch, x);
+            x += width;
+            if width > 0 {
+                move_x += 1;
+            }
         }
     }
 
@@ -124,6 +132,7 @@ pub fn assign_labels(
 
         labeled.push(LabeledCandidate {
             point: candidate.point,
+            move_x: candidate.move_x,
             label,
             display_start_x,
         });
@@ -228,65 +237,49 @@ mod tests {
         values.iter().map(|value| (*value).to_string()).collect()
     }
 
+    fn candidate(x: usize, y: usize, move_x: usize) -> Candidate {
+        Candidate {
+            point: Point { x, y },
+            move_x,
+        }
+    }
+
     #[test]
     fn finds_case_sensitive_matches_at_cell_positions() {
         let candidates = find_candidates(&lines(&["aA", "界a"]), 'a');
 
-        assert_eq!(
-            candidates,
-            vec![
-                Candidate {
-                    point: Point { x: 0, y: 0 }
-                },
-                Candidate {
-                    point: Point { x: 2, y: 1 }
-                }
-            ]
-        );
+        assert_eq!(candidates, vec![candidate(0, 0, 0), candidate(2, 1, 1)]);
     }
 
     #[test]
     fn expands_tabs_to_terminal_cells_when_finding_candidates() {
         let candidates = find_candidates(&lines(&["a\tb", "1234567\tb"]), 'b');
 
-        assert_eq!(
-            candidates,
-            vec![
-                Candidate {
-                    point: Point { x: 8, y: 0 }
-                },
-                Candidate {
-                    point: Point { x: 8, y: 1 }
-                }
-            ]
-        );
+        assert_eq!(candidates, vec![candidate(8, 0, 2), candidate(8, 1, 8)]);
     }
 
     #[test]
     fn finds_ascii_matches_after_japanese_text_at_cell_positions() {
         let candidates = find_candidates(&lines(&["日本語abc"]), 'a');
 
+        assert_eq!(candidates, vec![candidate(6, 0, 3)]);
+    }
+
+    #[test]
+    fn tracks_copy_mode_move_count_separately_from_display_cells() {
         assert_eq!(
-            candidates,
-            vec![Candidate {
-                point: Point { x: 6, y: 0 }
-            }]
+            find_candidates(&lines(&["😀abc"]), 'a'),
+            vec![candidate(2, 0, 1)]
+        );
+        assert_eq!(
+            find_candidates(&lines(&["e\u{301}abc"]), 'a'),
+            vec![candidate(1, 0, 1)]
         );
     }
 
     #[test]
     fn sorts_by_cursor_distance_then_screen_order() {
-        let mut candidates = vec![
-            Candidate {
-                point: Point { x: 0, y: 0 },
-            },
-            Candidate {
-                point: Point { x: 5, y: 2 },
-            },
-            Candidate {
-                point: Point { x: 3, y: 1 },
-            },
-        ];
+        let mut candidates = vec![candidate(0, 0, 0), candidate(5, 2, 5), candidate(3, 1, 3)];
 
         sort_candidates_by_distance(&mut candidates, Point { x: 4, y: 1 });
 
@@ -331,6 +324,7 @@ mod tests {
         let candidates = (0..27)
             .map(|index| Candidate {
                 point: Point { x: index, y: 0 },
+                move_x: index,
             })
             .collect::<Vec<_>>();
         let labeled = assign_labels(candidates, Point { x: 26, y: 0 }, 27);
@@ -341,14 +335,7 @@ mod tests {
 
     #[test]
     fn drops_colliding_labels() {
-        let candidates = vec![
-            Candidate {
-                point: Point { x: 0, y: 0 },
-            },
-            Candidate {
-                point: Point { x: 1, y: 0 },
-            },
-        ];
+        let candidates = vec![candidate(0, 0, 0), candidate(1, 0, 1)];
         let labeled = assign_labels(candidates, Point { x: 0, y: 0 }, 1);
 
         assert_eq!(labeled.len(), 1);
@@ -360,6 +347,7 @@ mod tests {
             &lines(&["abc"]),
             &[LabeledCandidate {
                 point: Point { x: 1, y: 0 },
+                move_x: 1,
                 label: "s".to_string(),
                 display_start_x: 1,
             }],
@@ -384,6 +372,7 @@ mod tests {
             &lines(&["日本語abc"]),
             &[LabeledCandidate {
                 point: Point { x: 6, y: 0 },
+                move_x: 3,
                 label: "a".to_string(),
                 display_start_x: 6,
             }],
