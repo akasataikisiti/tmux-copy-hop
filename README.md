@@ -9,7 +9,9 @@ ranges without moving the cursor step by step.
 行頭だけを選ぶモードも利用できます。`line-jump` は検索文字の入力を省略し、
 表示中の各行の先頭にラベルを表示して、選んだ行の行頭へ移動します。
 
-## MVP Behavior
+## Usage
+
+### Character jump
 
 ```text
 prefix+j
@@ -23,7 +25,21 @@ cursor to the selected cell. It does not start a selection.
 From copy-mode, a valid label keeps copy-mode active and moves only the cursor.
 Any existing selection is preserved.
 
-Cancel with `Escape` or `Ctrl-C`.
+Cancel either mode with `Escape` or `Ctrl-C`.
+
+### Line-head jump
+
+`line-jump` labels the beginning of every visible line. It skips the character
+search step and moves to the beginning of the line selected by the label.
+
+```text
+prefix+l
+choose a displayed line label
+```
+
+The line-head mode uses the same copy-mode behavior as character jump: it enters
+copy-mode when started from a normal pane and preserves an existing selection
+when started from copy-mode.
 
 ## Install
 
@@ -50,9 +66,11 @@ Build the binary:
 
 ```bash
 cargo build --release
+mkdir -p ~/.local/bin
+cp target/release/tmux-copy-hop ~/.local/bin/tmux-copy-hop
 ```
 
-Put `target/release/tmux-copy-hop` on `PATH`, then add this binding:
+Then add these bindings:
 
 ```tmux
 bind-key j run-shell "tmux-copy-hop jump"
@@ -67,7 +85,14 @@ This repository also includes a minimal TPM-style entry file:
 run-shell /path/to/tmux-copy-hop/tmux-copy-hop.tmux
 ```
 
-The MVP does not automatically build the Rust binary during plugin install.
+After changing the binary or tmux configuration, reload the configuration:
+
+```bash
+tmux source-file ~/.tmux.conf
+```
+
+The TPM-style entry file only installs the key bindings; it does not build the
+Rust binary automatically.
 
 ### Install Options
 
@@ -82,6 +107,43 @@ Install a specific version:
 ```bash
 VERSION=v0.1.0 sh install.sh
 ```
+
+### Updating an Existing Installation
+
+リリース版をすでに導入している場合は、インストールスクリプトをもう一度
+実行すると最新版に更新できます。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/akasataikisiti/tmux-copy-hop/main/install.sh | sh
+```
+
+`INSTALL_DIR` を指定して導入した場合は、更新時にも同じ値を指定します。
+
+```bash
+INSTALL_DIR=/path/to/bin sh install.sh
+```
+
+既存の `jump` 設定はそのまま使えます。行頭ジャンプも使う場合は、次の設定を
+追加してから tmux 設定を再読み込みします。
+
+```tmux
+bind-key l run-shell "tmux-copy-hop line-jump"
+```
+
+```bash
+tmux source-file ~/.tmux.conf
+```
+
+ソースから導入している場合は、リポジトリを更新してバイナリを再ビルドします。
+
+```bash
+git pull
+cargo build --release
+cp target/release/tmux-copy-hop ~/.local/bin/tmux-copy-hop
+```
+
+なお、インストールスクリプトで取得できるのは公開済みリリースです。新機能が
+リリースに含まれていない場合は、公開後に更新してください。
 
 ## Copy Workflow
 
@@ -146,7 +208,7 @@ prefix+j        # choose the end cell
 Enter           # copy selection
 ```
 
-### 行頭ジャンプ
+### 行頭ジャンプの操作
 
 既存のマッピングは変更せず、別のキーに追加できます。
 
@@ -158,16 +220,17 @@ bind-key l run-shell "tmux-copy-hop line-jump"
 `prefix+l` を押し、行頭に表示されたラベルを入力すると、その行の先頭へ
 移動します。通常ペインから実行した場合は copy-mode に入ります。
 
-## Current Limitations
+## Limitations
 
 - Only the currently visible pane content is targeted.
-- Search is one character and case-sensitive.
+- Character jump searches one character and is case-sensitive.
+- Line-head jump labels only the currently visible lines.
 - ASCII search is the primary target.
 - Popup rendering is plain text with highlighted labels.
 - The popup is centered with the target pane's width and height.
 - Movement uses copy-mode commands from the visible top line.
 - Full Unicode, mouse support, fuzzy search, OSC52, and true overlay rendering
-  are out of scope for the MVP.
+  are currently out of scope.
 
 ## Development
 

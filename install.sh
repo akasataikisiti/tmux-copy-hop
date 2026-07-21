@@ -58,5 +58,6 @@ echo "Installed tmux-copy-hop to $install_dir/tmux-copy-hop"
 echo
 echo "Add this to tmux.conf:"
 echo '  bind-key j run-shell "tmux-copy-hop jump"'
+echo '  bind-key l run-shell "tmux-copy-hop line-jump"'
 echo
 echo "Make sure $install_dir is on PATH inside tmux."
