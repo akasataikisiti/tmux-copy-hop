@@ -6,6 +6,9 @@ Hop-style pane jumping for tmux copy workflows.
 matches using short labels. The main target workflow is selecting copy-mode
 ranges without moving the cursor step by step.
 
+行頭だけを選ぶモードも利用できます。`line-jump` は検索文字の入力を省略し、
+表示中の各行の先頭にラベルを表示して、選んだ行の行頭へ移動します。
+
 ## MVP Behavior
 
 ```text
@@ -34,6 +37,9 @@ Then add this binding:
 
 ```tmux
 bind-key j run-shell "tmux-copy-hop jump"
+
+# 行頭ジャンプ（任意の追加マッピング）
+bind-key l run-shell "tmux-copy-hop line-jump"
 ```
 
 Make sure `~/.local/bin` is on `PATH` inside tmux.
@@ -50,6 +56,9 @@ Put `target/release/tmux-copy-hop` on `PATH`, then add this binding:
 
 ```tmux
 bind-key j run-shell "tmux-copy-hop jump"
+
+# 行頭ジャンプ（任意の追加マッピング）
+bind-key l run-shell "tmux-copy-hop line-jump"
 ```
 
 This repository also includes a minimal TPM-style entry file:
@@ -136,6 +145,18 @@ Space or v      # begin selection
 prefix+j        # choose the end cell
 Enter           # copy selection
 ```
+
+### 行頭ジャンプ
+
+既存のマッピングは変更せず、別のキーに追加できます。
+
+```tmux
+bind-key j run-shell "tmux-copy-hop jump"
+bind-key l run-shell "tmux-copy-hop line-jump"
+```
+
+`prefix+l` を押し、行頭に表示されたラベルを入力すると、その行の先頭へ
+移動します。通常ペインから実行した場合は copy-mode に入ります。
 
 ## Current Limitations
 

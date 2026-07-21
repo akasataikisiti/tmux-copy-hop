@@ -58,6 +58,17 @@ pub fn find_candidates(lines: &[String], needle: char) -> Vec<Candidate> {
     candidates
 }
 
+pub fn find_line_candidates(lines: &[String]) -> Vec<Candidate> {
+    lines
+        .iter()
+        .enumerate()
+        .map(|(y, _)| Candidate {
+            point: Point { x: 0, y },
+            move_x: 0,
+        })
+        .collect()
+}
+
 pub fn sort_candidates_by_distance(candidates: &mut [Candidate], cursor: Point) {
     candidates.sort_by(|a, b| {
         a.point
@@ -249,6 +260,14 @@ mod tests {
         let candidates = find_candidates(&lines(&["aA", "界a"]), 'a');
 
         assert_eq!(candidates, vec![candidate(0, 0, 0), candidate(2, 1, 1)]);
+    }
+
+    #[test]
+    fn finds_the_start_of_every_line() {
+        assert_eq!(
+            find_line_candidates(&lines(&["first", "", "third"])),
+            vec![candidate(0, 0, 0), candidate(0, 1, 0), candidate(0, 2, 0)]
+        );
     }
 
     #[test]

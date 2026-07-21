@@ -1,7 +1,9 @@
 use std::env;
 use std::process::ExitCode;
 
-use tmux_copy_hop::tmux::{Error, display_message, run_jump, run_popup};
+use tmux_copy_hop::tmux::{
+    Error, display_message, run_jump, run_line_jump, run_line_popup, run_popup,
+};
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
@@ -9,7 +11,9 @@ fn main() -> ExitCode {
 
     match command.as_deref().map(normalize_command) {
         Some("jump") => exit(run_jump()),
+        Some("line-jump") => exit(run_line_jump()),
         Some("popup") => exit(run_popup(&args.collect::<Vec<_>>())),
+        Some("line-popup") => exit(run_line_popup(&args.collect::<Vec<_>>())),
         Some("--help") | Some("-h") | None => {
             print_help();
             ExitCode::SUCCESS
@@ -80,11 +84,15 @@ tmux-copy-hop
 
 Usage:
   tmux-copy-hop jump
+  tmux-copy-hop line-jump
   tmux-copy-hop popup <pane-id> <width> <height> <was-copy-mode> <cursor-x> <cursor-y> <scroll-position>
+  tmux-copy-hop line-popup <pane-id> <width> <height> <was-copy-mode> <cursor-x> <cursor-y> <scroll-position>
 
 Commands:
   jump    Start a Hop-style pane jump
-  popup   Internal command run inside tmux display-popup"
+  line-jump  Start a line-head jump
+  popup   Internal command run inside tmux display-popup
+  line-popup Internal line-jump command run inside tmux display-popup"
     );
 }
 

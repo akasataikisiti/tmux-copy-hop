@@ -4,7 +4,8 @@ use std::io::{self, Read, Write};
 use std::process::{Command, Stdio};
 
 use crate::hop::{
-    Point, assign_labels, find_candidates, render_labeled_screen, render_plain_screen,
+    Point, assign_labels, find_candidates, find_line_candidates, render_labeled_screen,
+    render_plain_screen,
 };
 
 #[derive(Debug)]
@@ -66,10 +67,18 @@ impl PaneInfo {
 }
 
 pub fn run_jump() -> Result<()> {
+    run_jump_with_command("popup")
+}
+
+pub fn run_line_jump() -> Result<()> {
+    run_jump_with_command("line-popup")
+}
+
+fn run_jump_with_command(popup_command: &str) -> Result<()> {
     let pane = current_pane_info()?;
     let exe = env::current_exe()?;
     let command = format!(
-        "{} popup {} {} {} {} {} {} {}",
+        "{} {popup_command} {} {} {} {} {} {} {}",
         shell_quote(&exe.to_string_lossy()),
         shell_quote(&pane.pane_id),
         pane.width,
@@ -94,6 +103,14 @@ pub fn run_jump() -> Result<()> {
 }
 
 pub fn run_popup(args: &[String]) -> Result<()> {
+    run_popup_with_mode(args, false)
+}
+
+pub fn run_line_popup(args: &[String]) -> Result<()> {
+    run_popup_with_mode(args, true)
+}
+
+fn run_popup_with_mode(args: &[String], line_mode: bool) -> Result<()> {
     let popup = PopupArgs::parse(args)?;
     let _raw_mode = RawMode::enable()?;
 
@@ -110,16 +127,19 @@ pub fn run_popup(args: &[String]) -> Result<()> {
         popup.height,
     );
     render_popup_screen(&render_plain_screen(&lines, popup.width))?;
-    display_message("tmux-copy-hop: type jump key");
-
-    io::stdout().flush()?;
-    let needle = read_ascii_char()?;
-
-    let candidates = find_candidates(&lines, needle);
-    if candidates.is_empty() {
-        display_message(&format!("tmux-copy-hop: no matches for '{needle}'"));
-        return Err(Error::NoMatches(needle));
-    }
+    let candidates = if line_mode {
+        find_line_candidates(&lines)
+    } else {
+        display_message("tmux-copy-hop: type jump key");
+        io::stdout().flush()?;
+        let needle = read_ascii_char()?;
+        let candidates = find_candidates(&lines, needle);
+        if candidates.is_empty() {
+            display_message(&format!("tmux-copy-hop: no matches for '{needle}'"));
+            return Err(Error::NoMatches(needle));
+        }
+        candidates
+    };
 
     let labeled = assign_labels(candidates, popup.cursor, popup.width);
     let label_width = labeled
