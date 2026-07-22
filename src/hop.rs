@@ -121,12 +121,33 @@ pub fn assign_labels(
 
     sort_candidates_by_distance(&mut candidates, cursor);
 
-    let width = label_width(candidates.len());
+    let one_char_labels = assign_labels_with_width(&candidates, 1, pane_width);
+    let width = if candidates.len() <= LABEL_ALPHABET.chars().count()
+        || one_char_labels.len() < LABEL_ALPHABET.chars().count()
+    {
+        return one_char_labels;
+    } else {
+        label_width(candidates.len())
+    };
+
+    assign_labels_with_width(&candidates, width, pane_width)
+}
+
+fn assign_labels_with_width(
+    candidates: &[Candidate],
+    width: usize,
+    pane_width: usize,
+) -> Vec<LabeledCandidate> {
     let mut occupied = HashSet::new();
     let mut labeled = Vec::new();
 
     for (index, candidate) in candidates.iter().enumerate() {
-        let label = label_for_index(index, width);
+        if width == 1 && labeled.len() >= LABEL_ALPHABET.chars().count() {
+            break;
+        }
+
+        let label_index = if width == 1 { labeled.len() } else { index };
+        let label = label_for_index(label_index, width);
         let display_start_x = label_display_start(candidate.point.x, width, pane_width);
         let display_cells = display_start_x..display_start_x + width;
 
@@ -378,6 +399,25 @@ mod tests {
 
         assert_eq!(labeled[0].point, Point { x: 26, y: 0 });
         assert_eq!(labeled[0].display_start_x, 25);
+    }
+
+    #[test]
+    fn uses_one_character_labels_when_collisions_leave_fewer_than_26_candidates() {
+        let mut candidates = (0..25)
+            .map(|index| Candidate {
+                point: Point { x: index, y: 0 },
+                move_x: index,
+            })
+            .collect::<Vec<_>>();
+        candidates.extend((0..5).map(|_| Candidate {
+            point: Point { x: 0, y: 0 },
+            move_x: 0,
+        }));
+
+        let labeled = assign_labels(candidates, Point { x: 0, y: 0 }, 25);
+
+        assert_eq!(labeled.len(), 25);
+        assert!(labeled.iter().all(|candidate| candidate.label.len() == 1));
     }
 
     #[test]
