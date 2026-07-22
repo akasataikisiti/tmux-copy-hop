@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 
 use crate::hop::{
     Point, assign_labels, find_candidates, find_line_candidates, render_labeled_screen,
-    render_plain_screen,
+    render_labeled_screen_with_prefix, render_plain_screen,
 };
 
 #[derive(Debug)]
@@ -146,12 +146,32 @@ fn run_popup_with_mode(args: &[String], line_mode: bool) -> Result<()> {
         .first()
         .map(|candidate| candidate.label.len())
         .unwrap_or(0);
-    let rendered = render_labeled_screen(&lines, &labeled, popup.width);
+    let mut prefix = String::new();
+    let label = loop {
+        let rendered = if prefix.is_empty() {
+            render_labeled_screen(&lines, &labeled, popup.width)
+        } else {
+            render_labeled_screen_with_prefix(&lines, &labeled, popup.width, &prefix)
+        };
+        render_popup_screen(&rendered)?;
+        display_message("tmux-copy-hop: type label");
 
-    render_popup_screen(&rendered)?;
-    display_message("tmux-copy-hop: type label");
+        prefix.push(read_ascii_char()?);
+        let matching = labeled
+            .iter()
+            .filter(|candidate| candidate.label.starts_with(&prefix))
+            .count();
 
-    let label = read_ascii_string(label_width)?;
+        if matching == 0 {
+            display_message("tmux-copy-hop: invalid label");
+            return Err(Error::InvalidLabel);
+        }
+
+        if prefix.len() == label_width {
+            break prefix;
+        }
+    };
+
     let target = labeled
         .iter()
         .find(|candidate| candidate.label == label)
@@ -364,16 +384,6 @@ fn read_ascii_char() -> Result<char> {
         byte if byte.is_ascii() => Ok(byte as char),
         byte => Err(Error::Parse(format!("non-ASCII input byte: {byte}"))),
     }
-}
-
-fn read_ascii_string(width: usize) -> Result<String> {
-    let mut value = String::new();
-
-    for _ in 0..width {
-        value.push(read_ascii_char()?);
-    }
-
-    Ok(value)
 }
 
 fn shell_quote(value: &str) -> String {

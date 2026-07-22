@@ -157,15 +157,43 @@ pub fn render_labeled_screen(
     labeled: &[LabeledCandidate],
     pane_width: usize,
 ) -> String {
+    render_labeled_screen_with_prefix(lines, labeled, pane_width, "")
+}
+
+pub fn render_labeled_screen_with_prefix(
+    lines: &[String],
+    labeled: &[LabeledCandidate],
+    pane_width: usize,
+    prefix: &str,
+) -> String {
     let mut grid = lines
         .iter()
         .map(|line| line_to_cells(line, pane_width))
         .collect::<Vec<_>>();
 
     for candidate in labeled {
+        if !prefix.is_empty() && !candidate.label.starts_with(prefix) {
+            continue;
+        }
+
         if let Some(row) = grid.get_mut(candidate.point.y) {
-            for (offset, ch) in candidate.label.chars().enumerate() {
-                let x = candidate.display_start_x + offset;
+            let prefix_len = prefix.chars().count();
+            let label_chars = candidate.label.chars().collect::<Vec<_>>();
+            let chars = if prefix.is_empty() {
+                label_chars.as_slice()
+            } else {
+                label_chars
+                    .get(prefix_len..prefix_len.saturating_add(1))
+                    .unwrap_or_default()
+            };
+
+            for (offset, ch) in chars.iter().enumerate() {
+                let x = candidate.display_start_x
+                    + if prefix.is_empty() {
+                        offset
+                    } else {
+                        prefix_len + offset
+                    };
                 if let Some(cell) = row.get_mut(x) {
                     *cell = format!("\x1b[38;5;205;1m{ch}\x1b[0m");
                 }
@@ -399,5 +427,39 @@ mod tests {
         );
 
         assert_eq!(rendered, "日本語\u{1b}[38;5;205;1ma\u{1b}[0mbc");
+    }
+
+    #[test]
+    fn renders_only_next_label_character_after_prefix() {
+        let rendered = render_labeled_screen_with_prefix(
+            &lines(&["abcdef"]),
+            &[
+                LabeledCandidate {
+                    point: Point { x: 0, y: 0 },
+                    move_x: 0,
+                    label: "aa".to_string(),
+                    display_start_x: 0,
+                },
+                LabeledCandidate {
+                    point: Point { x: 3, y: 0 },
+                    move_x: 3,
+                    label: "as".to_string(),
+                    display_start_x: 3,
+                },
+                LabeledCandidate {
+                    point: Point { x: 5, y: 0 },
+                    move_x: 5,
+                    label: "sa".to_string(),
+                    display_start_x: 5,
+                },
+            ],
+            6,
+            "a",
+        );
+
+        assert_eq!(
+            rendered,
+            "a\u{1b}[38;5;205;1ma\u{1b}[0mcd\u{1b}[38;5;205;1ms\u{1b}[0mf"
+        );
     }
 }
