@@ -167,7 +167,7 @@ pub fn render_labeled_screen(
             for (offset, ch) in candidate.label.chars().enumerate() {
                 let x = candidate.display_start_x + offset;
                 if let Some(cell) = row.get_mut(x) {
-                    *cell = format!("\x1b[34;1m{ch}\x1b[0m");
+                    *cell = format!("\x1b[38;5;205;1m{ch}\x1b[0m");
                 }
             }
         }
@@ -373,7 +373,7 @@ mod tests {
             3,
         );
 
-        assert_eq!(rendered, "a\u{1b}[34;1ms\u{1b}[0mc");
+        assert_eq!(rendered, "a\u{1b}[38;5;205;1ms\u{1b}[0mc");
     }
 
     #[test]
@@ -398,6 +398,6 @@ mod tests {
             12,
         );
 
-        assert_eq!(rendered, "日本語\u{1b}[34;1ma\u{1b}[0mbc");
+        assert_eq!(rendered, "日本語\u{1b}[38;5;205;1ma\u{1b}[0mbc");
     }
 }
